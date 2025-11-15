@@ -1,3 +1,28 @@
+# Remote Desktop en Python con webrtc
+
+## Instalación y preparación
+---
+1. Crear python venv
+```
+python3 -m venv ./remote_desktop/
+```
+
+2. Activarlo:
+
+```
+source ./remote_desktop/bin/activate
+```
+
+3. Instalar dependencias:
+
+```
+pip install websockets cryptography mss Pillow opencv-python pyautogui aiortc numpy
+```
+
+----
+
+## Descripción
+
 WebRTC real, P2P, sin túneles, sin puertos abiertos.
 
 Tu arquitectura ya está prácticamente lista:
