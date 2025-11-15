@@ -1,27 +1,61 @@
-1) Arquitectura (resumen rápido)
+WebRTC real, P2P, sin túneles, sin puertos abiertos.
 
-Broker / Server (en la nube o en tu LAN): crea sesiones y tokens (AES-256 GCM). Mantiene la lista de tokens válidos y estados (lectura/esperando-control/concedido). También retransmite datos si cliente y host no pueden hacer P2P (recomendado empezar con este modelo).
+Tu arquitectura ya está prácticamente lista:
 
-Host (la máquina que compartes): captura pantalla periódicamente, las comprime (JPEG), y envía al servidor. Aplica eventos de entrada (mouse/teclado) solo si la sesión tiene control concedido.
+Host captura pantalla
 
-Viewer / Cliente: recibe imágenes, muestra en ventana; envía petición de control; si el servidor le concede control, envía eventos de entrada.
+Viewer decodifica y renderiza
 
-Canal: websocket(s) sobre TLS (wss). Además del TLS (transporte), el servidor usa un token AES-GCM para autenticar/autorizar la sesión (lo pediste explícito).
+Servidor de señalización WebSocket ya lo tenemos
 
-Por qué usar websockets: simple para enviar binarios y mensajes JSON en tiempo real.
+Ahora implementamos offer/answer + ICE + DataChannel para que el streaming viaje punto a punto.
 
-2) Consideraciones de seguridad (no las saltees)
+🔥 PLAN EXACTO EN 3 ETAPAS (rápido, limpio)
+1. Actualizar el signaling server
 
-Usar TLS (SSL) para websockets (wss://). Nunca desplegar sin TLS en Internet.
+Tu server_signal.py ya sirve para intercambiar mensajes JSON.
+Solo necesitamos manejar:
 
-AES-GCM para tokens (autenticidad + confidencialidad). No uses AES-ECB.
+"offer"
 
-Rotación y expiración de tokens (ej: 5–60 min según necesidad).
+"answer"
 
-Autorización explícita para control: el host (o el servidor si confías en él) debe aprobar cada cesión de control.
+"candidate"
 
-Registro / audit log para saber quién se conectó.
+"ready" (para que arranque el host cuando entra el viewer)
 
-Evita ejecutar al host con privilegios innecesarios. En Windows, el envío de eventos de entrada puede requerir privilegios.
+👉 No necesita modificaciones excepto aceptar esos tipos, y eso YA lo hace, porque tú server reenvía cualquier JSON.
 
-Para producción considerar: autenticación por usuario + 2FA, límites de conexión, protección contra fuerza bruta, y revisión legal (soporte remoto puede tener implicaciones de privacidad).
+✔️ Conclusión:
+El signaling server YA sirve para WebRTC.
+
+2. Host: crear RTCPeerConnection + enviar la imagen como WebRTC
+
+Acá vamos a usar DataChannel, no un video track, porque vos generás una imagen comprimida (JPEG/PNG) por frame.
+
+Host hace:
+
+pc = RTCPeerConnection()
+
+channel = pc.createDataChannel("stream")
+
+Genera un offer
+
+Lo envía al viewer via signaling
+
+Empieza a capturar cada frame, lo comprime y lo manda con
+channel.send(jpeg_bytes)
+
+3. Viewer: recibe offer → crea answer → renderiza los frames
+
+El viewer:
+
+Espera "offer"
+
+pc = RTCPeerConnection()
+
+pc.ondatachannel = on_datachannel
+
+Crea answer
+
+Recibe bytes de cada frame → los pasa al renderizado
